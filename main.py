@@ -41,9 +41,9 @@ LEVEL_ROLES = [
 
 # Shop Roles
 SHOP_ROLES = [
-    {"price": 3000, "role_id": 1354671043146682398, "name": "Snow Guardian ❄️"},
-    {"price": 7000, "role_id": 1354672101180575795, "name": "Ice Noble 🧊"},
-    {"price": 15000, "role_id": 1354672108508020818, "name": "Arctic King 👑"}
+    {"price": 3000, "role_id": 1354671043146682398, "name": "Minion ❄️"},
+    {"price": 7000, "role_id": 1354672101180575795, "name": "Soldier 🧊"},
+    {"price": 15000, "role_id": 1354672108508020818, "name": "Veteran 👑"}
 ]
 
 # XP Ranges
@@ -771,7 +771,7 @@ async def scramble_command(ctx):
         {"word": "bleach", "hint": "Soul Reaper"},
         {"word": "goku", "hint": "Saiyan hero"},
         {"word": "luffy", "hint": "Straw hat pirate"},
-        {"word": "ichigo", "hint": "Substitute Soul Reaper"}
+        {"word": "ichigo", "hint": "Substitute Soul Reaper"},
     {"word": "eren", "hint": "Titan slayer"},
     {"word": "gon", "hint": "Hunter x Hunter protagonist"},
     {"word": "killua", "hint": "Zoldyck assassin"},
