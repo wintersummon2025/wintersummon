@@ -422,26 +422,35 @@ async def start_snowquiz(context, user):
         {"question": "In Naruto, who is known as the Copy Ninja?", "answer": "kakashi"}
     ]
     random.shuffle(questions)
-    correct = 0
-    for i, qa in enumerate(questions, start=1):
+   
+    random.shuffle(questions)  # Shuffle questions for randomness
+    correct = 0  
+
+    for i, qa in enumerate(questions[:5], start=1):  # Limit to 5 questions
         msg = await channel.send(f"**Q{i}:** {qa['question']}\n(You have 10 seconds to answer!)")
+
         # Start live countdown
         countdown_task = asyncio.create_task(start_countdown(msg, 10, qa['question'], i))
+
         def check(m):
             return m.author == user and m.channel == channel
+
         try:
             guess = await bot.wait_for("message", check=check, timeout=10.0)
             countdown_task.cancel()
+
             if guess.content.lower().strip() == qa["answer"]:
                 correct += 1
-                add_snowcoins(user.id, 30)
-                await channel.send("Correct! You earned 30 🍙 snowcoins.")
+                add_snowcoins(user.id, 30)  # Reward system
+                await channel.send("✅ Correct! You earned **30 🍙 snowcoins**.")
             else:
-                await channel.send(f"Wrong! The correct answer was **{qa['answer']}**.")
+                await channel.send(f"❌ Wrong! The correct answer was **{qa['answer']}**.")
         except asyncio.TimeoutError:
             countdown_task.cancel()
-            await channel.send(f"Time's up! The correct answer was **{qa['answer']}**.")
-    await channel.send(f"**Quiz Finished!** You answered **{correct}** out of **{len(questions)}** correctly.")
+            await channel.send(f"⏳ Time's up! The correct answer was **{qa['answer']}**.")
+
+    # **Final Score & Game Over Message**
+    await channel.send(f"🎉 **Quiz Finished!** You answered **{correct}** out of **5** correctly.\n💀 **Game Over!** Use `/snowquiz` or `W! snowquiz` to play again!")
 
 # --- Rock-Paper-Scissors (RPS) Multiplayer ---
 class RPSChallengeView(ui.View):
