@@ -20,7 +20,7 @@ import threading
 
 # === SENSITIVE TOKENS (Demo Only) ===
 # In production, use environment variables or a .env file.
-BOT_TOKEN = "MTM1NDgxNDAyNjY5MzA4MzI4OA.GRjFcj.DBIp0f4Zrbzn_RtFMPy4J1dyltgQke_k1tvPAs"
+BOT_TOKEN = "MTM1NDgxNDAyNjY5MzA4MzI4OA.GIQZAS.F63fTH3l7dLrv9jJbpLRqdH521OorMeUDAVj10"
 
 # === Discord Settings ===
 SERVER_ID = 1341825447964577873
