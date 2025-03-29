@@ -18,7 +18,7 @@ import threading
 # 1. Configuration & Setup       #
 ##################################
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN")  # Set this in your .env file
+BOT_TOKEN = os.environ.get("BOT_TOKEN")  # Set in your .env file
 
 # Server & Channel IDs
 SERVER_ID = 1341825447964577873
@@ -50,7 +50,7 @@ SHOP_ROLES = [
 XP_RANGE_NORMAL = (22, 33)
 XP_RANGE_COOLDOWN = (3, 6)
 
-# Spam Control
+# Spam Control Thresholds
 SPAM_3SEC_LIMIT = 5
 SPAM_6SEC_LIMIT = 10
 SPAM_TIMEOUT_HOURS = 12
@@ -69,9 +69,9 @@ intents = discord.Intents.all()
 bot = commands.Bot(command_prefix="w!", intents=intents, case_insensitive=True)
 
 # Data stores
-xp_data = {}
-xp_cooldown = {}
-messages_timestamps = {}
+xp_data = {}         # { "user_id": {"xp": value} }
+xp_cooldown = {}     # { "user_id": datetime }
+messages_timestamps = {}  # { "user_id": [timestamps] }
 
 ##################################
 # 2. Keep-Alive Flask App        #
@@ -182,7 +182,7 @@ async def on_member_join(member):
         role = member.guild.get_role(JOIN_ROLE_ID)
         if role:
             await member.add_roles(role)
-        # Cute anime welcome DM
+        # Send cute anime welcome DM
         embed = discord.Embed(
             title="Welcome to Winter's Wonderland!",
             description="We’re so happy you’re here! ❄️ Grab some hot cocoa and let the winter magic begin!",
@@ -284,7 +284,10 @@ async def snowquiz_slash(interaction: discord.Interaction):
 async def start_snowquiz(context, user):
     channel = context.channel
     questions = [
-{"question": "In Naruto, what is the name of the guy who never skips leg day?", "answer": "rock lee"},
+        {"question": "Which anime features a notebook that kills anyone whose name is written in it?", "answer": "death note"},
+        {"question": "Name the bald hero from One Punch Man", "answer": "saitama"},
+        {"question": "In Naruto, who is known as the Copy Ninja?", "answer": "kakashi"},
+        {"question": "In Naruto, what is the name of the guy who never skips leg day?", "answer": "rock lee"},
 {"question": "What is the name of the most overpowered bald guy in anime?", "answer": "saitama"},
 {"question": "Which anime features a book that lets you play God with people's lives?", "answer": "death note"},
 {"question": "In One Piece, what does Luffy want to become? (Hint: Not a chef!)", "answer": "pirate king"},
@@ -597,14 +600,12 @@ async def slash_flip(interaction: discord.Interaction, bet: int = 10, opponent: 
     await flip_command(ctx, bet, opponent)
 
 # --- Roll (Dice Duel) with Multiplayer Option ---
-@bot.command(name="roll", help="Roll dice vs Bot or challenge a user. In multiplayer, the opponent gets a DM prompt to choose a number.")
+@bot.command(name="roll", help="Roll dice vs Bot or challenge a user. In multiplayer, opponents DM a number.")
 async def roll_command(ctx, bet: int = 20, opponent: discord.Member = None):
     if bet < 20:
         return await ctx.send("Minimum bet is 20 🍙!")
-    user_coins = get_snowcoins(ctx.author.id)
-    if user_coins < bet:
+    if get_snowcoins(ctx.author.id) < bet:
         return await ctx.send("You don't have enough snowcoins! ❄️")
-    # VS Bot Mode
     if opponent is None:
         player_roll = random.randint(1, 100)
         bot_roll = random.randint(1, 100)
@@ -625,32 +626,29 @@ async def roll_command(ctx, bet: int = 20, opponent: discord.Member = None):
     else:
         if opponent.bot:
             return await ctx.send("❄️ You can't challenge a bot!")
-        # Multiplayer Mode: DM the opponent to pick a number between 1 and 50 within 15 seconds
         try:
-            await opponent.send(f"You have been challenged to a dice duel by {ctx.author.mention}! Please reply with a number between 1 and 50 within 15 seconds.")
-        except Exception as e:
+            await opponent.send(f"You have been challenged to a dice duel by {ctx.author.mention}! Please reply with a number (1-50) within 15 seconds.")
+        except Exception:
             return await ctx.send("Could not DM the opponent. They might have DMs closed.")
         def check(m):
             return m.author == opponent and m.content.isdigit()
         try:
             dm_response = await bot.wait_for("message", check=check, timeout=15.0)
-            opponent_choice = int(dm_response.content)
-            # For the challenger, also DM to choose a number
+            opp_choice = int(dm_response.content)
             try:
-                await ctx.author.send("Please reply with a number between 1 and 50 within 15 seconds for your roll.")
-            except Exception as e:
+                await ctx.author.send("Reply with a number (1-50) within 15 seconds for your roll.")
+            except Exception:
                 return await ctx.send("Could not DM you. Check your DM settings.")
             dm_response2 = await bot.wait_for("message", check=lambda m: m.author == ctx.author and m.content.isdigit(), timeout=15.0)
-            challenger_choice = int(dm_response2.content)
-            # Compare the two numbers; the one with the higher number wins (tie if equal)
+            chal_choice = int(dm_response2.content)
             embed = discord.Embed(title="🎲 Multiplayer Dice Duel 🎲", color=0x7289da)
-            embed.add_field(name=f"{ctx.author.display_name}'s Choice", value=challenger_choice, inline=True)
-            embed.add_field(name=f"{opponent.display_name}'s Choice", value=opponent_choice, inline=True)
-            if challenger_choice > opponent_choice:
+            embed.add_field(name=f"{ctx.author.display_name}'s Choice", value=chal_choice, inline=True)
+            embed.add_field(name=f"{opponent.display_name}'s Choice", value=opp_choice, inline=True)
+            if chal_choice > opp_choice:
                 add_snowcoins(ctx.author.id, bet)
                 embed.description = f"🏆 {ctx.author.mention} wins {bet} 🍙 snowcoins!"
                 embed.color = 0x00ff00
-            elif challenger_choice < opponent_choice:
+            elif chal_choice < opp_choice:
                 add_snowcoins(ctx.author.id, -bet)
                 embed.description = f"💔 {ctx.author.mention} loses {bet} 🍙 snowcoins!"
                 embed.color = 0xff0000
@@ -665,7 +663,78 @@ async def slash_roll(interaction: discord.Interaction, bet: int = 20, opponent: 
     ctx = await bot.get_context(interaction.message)
     await roll_command(ctx, bet, opponent)
 
-# --- Additional Game: Maze Game (Using Buttons) ---
+# --- Snowfight Game with Button "Throw" ---
+class SnowfightView(ui.View):
+    def __init__(self, player1, player2, rounds=3):
+        super().__init__(timeout=120)
+        self.player1 = player1
+        self.player2 = player2
+        self.rounds = rounds
+        self.current_round = 0
+        self.players = {
+            player1.id: {"health": 70, "dodge": 10},
+            player2.id: {"health": 70, "dodge": 10}
+        }
+        self.turn = player1
+
+    @ui.button(label="Throw", style=discord.ButtonStyle.primary)
+    async def throw_button(self, interaction: discord.Interaction, button: ui.Button):
+        if interaction.user != self.turn:
+            return await interaction.response.send_message("Not your turn!", ephemeral=True)
+        target = self.player2 if self.turn == self.player1 else self.player1
+        if random.randint(1, 100) <= self.players[target.id]["dodge"]:
+            outcome = f"{target.mention} dodged the snowball!"
+        else:
+            damage = random.randint(5, 25)
+            self.players[target.id]["health"] -= damage
+            outcome = f"{self.turn.mention} hit {target.mention} for {damage} damage!"
+        self.current_round += 1
+        await interaction.response.send_message(outcome)
+        hp_update = f"HP Update: {self.player1.mention}: **{self.players[self.player1.id]['health']} HP** | {self.player2.mention}: **{self.players[self.player2.id]['health']} HP**"
+        await interaction.followup.send(hp_update)
+        if self.players[target.id]["health"] <= 0:
+            await interaction.followup.send(f"🏆 {self.turn.mention} wins the snowfight!")
+            add_snowcoins(self.turn.id, 50)
+            return self.stop()
+        if self.current_round < self.rounds:
+            self.turn = target
+            await interaction.followup.send(f"Round {self.current_round+1}: {self.turn.mention}, it's your turn! Press **Throw**.")
+        else:
+            p1_hp = self.players[self.player1.id]["health"]
+            p2_hp = self.players[self.player2.id]["health"]
+            if p1_hp > p2_hp:
+                winner = self.player1
+            elif p2_hp > p1_hp:
+                winner = self.player2
+            else:
+                winner = None
+            if winner:
+                await interaction.followup.send(f"🏆 {winner.mention} wins the snowfight after {self.rounds} rounds!")
+                add_snowcoins(winner.id, 50)
+            else:
+                await interaction.followup.send("The snowfight is a tie!")
+            self.stop()
+
+@bot.command(name="snowfight", help="Start a turn-based snowball fight!")
+async def snowfight_command(ctx, opponent: discord.Member):
+    if opponent.bot:
+        return await ctx.send("❄️ You can't fight bots!")
+    if opponent == ctx.author:
+        return await ctx.send("❄️ You can't fight yourself!")
+    view = SnowfightView(ctx.author, opponent, rounds=3)
+    await ctx.send(f"❄️ Snowfight started between {ctx.author.mention} and {opponent.mention}! Each player has 70 HP. 3 rounds maximum. {ctx.author.mention} goes first. Press **Throw** to attack!", view=view)
+    await view.wait()
+
+@bot.tree.command(name="snowfight", description="Challenge someone to a snowfight!")
+@app_commands.describe(opponent="The user you want to fight")
+async def slash_snowfight(interaction: discord.Interaction, opponent: discord.Member):
+    if opponent.bot:
+        return await interaction.response.send_message("❄️ You can't fight bots!", ephemeral=True)
+    if opponent == interaction.user:
+        return await interaction.response.send_message("❄️ You can't fight yourself!", ephemeral=True)
+    await interaction.response.send_message(f"❄️ {interaction.user.mention} challenged {opponent.mention} to a snowfight!\nType `w!snowfight @user` in the chat to start!")
+
+# --- Additional Game: Maze Game ---
 class MazeView(ui.View):
     def __init__(self, user, rounds=3):
         super().__init__(timeout=60)
@@ -726,44 +795,7 @@ async def slash_maze(interaction: discord.Interaction):
     view = MazeView(interaction.user, rounds=3)
     await interaction.response.send_message(f"{interaction.user.mention}, welcome to the Snow Maze! Choose your direction wisely for 3 rounds. Good luck!", view=view)
 
-##################################
-# 8. Additional Commands         #
-##################################
-@bot.command()
-async def stats(ctx):
-    c.execute("SELECT games_played, wins, losses FROM users WHERE user_id=?", (ctx.author.id,))
-    row = c.fetchone()
-    if row:
-        stats_data = {"games_played": row[0], "wins": row[1], "losses": row[2]}
-    else:
-        stats_data = {"games_played": 0, "wins": 0, "losses": 0}
-    embed = discord.Embed(title="Your Game Stats", color=0x000000)
-    if ctx.author.avatar:
-        embed.set_thumbnail(url=ctx.author.avatar.url)
-    embed.add_field(name="Games Played", value=str(stats_data["games_played"]), inline=True)
-    embed.add_field(name="Wins", value=str(stats_data["wins"]), inline=True)
-    embed.add_field(name="Losses", value=str(stats_data["losses"]), inline=True)
-    embed.set_footer(text="Keep playing and improve!")
-    await ctx.send(embed=embed)
-
-@bot.tree.command(name="stats", description="Check your game statistics!")
-async def slash_stats(interaction: discord.Interaction):
-    c.execute("SELECT games_played, wins, losses FROM users WHERE user_id=?", (interaction.user.id,))
-    row = c.fetchone()
-    if row:
-        stats_data = {"games_played": row[0], "wins": row[1], "losses": row[2]}
-    else:
-        stats_data = {"games_played": 0, "wins": 0, "losses": 0}
-    embed = discord.Embed(title="Your Game Stats", color=0x000000)
-    if interaction.user.avatar:
-        embed.set_thumbnail(url=interaction.user.avatar.url)
-    embed.add_field(name="Games Played", value=str(stats_data["games_played"]), inline=True)
-    embed.add_field(name="Wins", value=str(stats_data["wins"]), inline=True)
-    embed.add_field(name="Losses", value=str(stats_data["losses"]), inline=True)
-    embed.set_footer(text="Keep playing and improve!")
-    await interaction.response.send_message(embed=embed)
-
-# --- New Anime Word Scramble Command ---
+# --- New Anime Word Scramble ---
 @bot.command(name="scramble", help="Unscramble the anime word!")
 async def scramble_command(ctx):
     anime_words = [
@@ -855,7 +887,6 @@ async def scramble_command(ctx):
     hint = game["hint"]
     scrambled = ''.join(random.sample(word, len(word)))
     message = await ctx.send(f"Unscramble this anime word: **{scrambled}**\nHint: {hint}\nTime remaining: **15** seconds")
-    
     async def countdown():
         remaining = 15
         while remaining > 0:
@@ -887,7 +918,134 @@ async def slash_scramble(interaction: discord.Interaction):
     await scramble_command(ctx)
 
 ##################################
+# 8. Additional Commands         #
+##################################
+@bot.command(name="level", help="Check your XP and level!")
+async def level(ctx):
+    user_id = str(ctx.author.id)
+    xp_amount = xp_data.get(user_id, {"xp": 0})["xp"]
+    lvl = xp_amount // 1000
+    booster = ctx.author.get_role(BOOSTER_ROLE_ID) is not None
+    embed = discord.Embed(
+        title=f"{ctx.author.name}'s Level Card",
+        color=0xfb5ffc,
+        timestamp=datetime.utcnow()
+    )
+    if ctx.author.avatar:
+        embed.set_thumbnail(url=ctx.author.avatar.url)
+    embed.add_field(name="XP (Snowdrops 💠)", value=f"{xp_amount}", inline=True)
+    embed.add_field(name="Level", value=f"{lvl}", inline=True)
+    embed.add_field(name="Server", value=ctx.guild.name, inline=False)
+    embed.set_footer(text="Winter's Wonderland Server" if not booster else "Server Booster! ❄️")
+    await ctx.send(embed=embed)
+
+@bot.tree.command(name="level", description="Check your XP and level!")
+async def slash_level(interaction: discord.Interaction):
+    user_id = str(interaction.user.id)
+    xp_amount = xp_data.get(user_id, {"xp": 0})["xp"]
+    lvl = xp_amount // 1000
+    booster = interaction.user.get_role(BOOSTER_ROLE_ID) is not None
+    embed = discord.Embed(
+        title=f"{interaction.user.name}'s Level Card",
+        color=0xfb5ffc,
+        timestamp=datetime.utcnow()
+    )
+    if interaction.user.avatar:
+        embed.set_thumbnail(url=interaction.user.avatar.url)
+    embed.add_field(name="XP (Snowdrops 💠)", value=f"{xp_amount}", inline=True)
+    embed.add_field(name="Level", value=f"{lvl}", inline=True)
+    embed.add_field(name="Server", value=interaction.guild.name, inline=False)
+    embed.set_footer(text="Winter's Wonderland Server" if not booster else "Server Booster! ❄️")
+    await interaction.response.send_message(embed=embed)
+
+@bot.command(name="wallet", help="Check your snowcoins balance!")
+async def wallet(ctx):
+    coins = get_snowcoins(ctx.author.id)
+    await ctx.send(f"{ctx.author.mention}, you have **{coins}** 🍙 snowcoins in your wallet!")
+
+@bot.tree.command(name="wallet", description="Check your snowcoins balance!")
+async def slash_wallet(interaction: discord.Interaction):
+    coins = get_snowcoins(interaction.user.id)
+    await interaction.response.send_message(f"{interaction.user.mention}, you have **{coins}** 🍙 snowcoins in your wallet!")
+
+@bot.command(name="shop", help="Browse the Winter Shop!")
+async def shop(ctx):
+    embed = discord.Embed(title="❄️ Winter Shop ❄️", color=0x00ffcc)
+    lines = []
+    for item in SHOP_ROLES:
+        lines.append(f"**{item['name']}** - Costs **{item['price']}** 🍙")
+    embed.description = "\n".join(lines)
+    embed.set_footer(text="Use w!buy <role name> to purchase a role!")
+    await ctx.send(embed=embed)
+
+@bot.command(name="buy", help="Purchase a role from the shop!")
+async def buy(ctx, *, role_name: str):
+    role_name_lower = role_name.lower().strip()
+    for item in SHOP_ROLES:
+        if role_name_lower in item["name"].lower():
+            price = item["price"]
+            role_id = item["role_id"]
+            user_coins = get_snowcoins(ctx.author.id)
+            if user_coins >= price:
+                role_obj = ctx.guild.get_role(role_id)
+                if not role_obj:
+                    return await ctx.send("That role doesn't exist on the server. Contact an admin.")
+                if role_obj in ctx.author.roles:
+                    return await ctx.send("You already have that role!")
+                add_snowcoins(ctx.author.id, -price)
+                await ctx.author.add_roles(role_obj)
+                return await ctx.send(f"Congrats {ctx.author.mention}, you purchased **{item['name']}** for **{price}** 🍙!")
+            else:
+                return await ctx.send(f"You don't have enough 🍙 snowcoins to buy **{item['name']}**.")
+    await ctx.send("That item/role doesn't exist in the shop. Check your spelling or see w!shop.")
+
+@bot.tree.command(name="shop", description="Browse the Winter Shop!")
+async def slash_shop(interaction: discord.Interaction):
+    embed = discord.Embed(title="❄️ Winter Shop ❄️", color=0x00ffcc)
+    lines = []
+    for item in SHOP_ROLES:
+        lines.append(f"**{item['name']}** - Costs **{item['price']}** 🍙")
+    embed.description = "\n".join(lines)
+    embed.set_footer(text="Use w!buy <role name> to purchase a role!")
+    await interaction.response.send_message(embed=embed)
+
+@bot.command(name="stats", help="Check your game statistics!")
+async def stats(ctx):
+    c.execute("SELECT games_played, wins, losses FROM users WHERE user_id=?", (ctx.author.id,))
+    row = c.fetchone()
+    if row:
+        stats_data = {"games_played": row[0], "wins": row[1], "losses": row[2]}
+    else:
+        stats_data = {"games_played": 0, "wins": 0, "losses": 0}
+    embed = discord.Embed(title="Your Game Stats", color=0x000000)
+    if ctx.author.avatar:
+        embed.set_thumbnail(url=ctx.author.avatar.url)
+    embed.add_field(name="Games Played", value=str(stats_data["games_played"]), inline=True)
+    embed.add_field(name="Wins", value=str(stats_data["wins"]), inline=True)
+    embed.add_field(name="Losses", value=str(stats_data["losses"]), inline=True)
+    embed.set_footer(text="Keep playing and improve!")
+    await ctx.send(embed=embed)
+
+@bot.tree.command(name="stats", description="Check your game statistics!")
+async def slash_stats(interaction: discord.Interaction):
+    c.execute("SELECT games_played, wins, losses FROM users WHERE user_id=?", (interaction.user.id,))
+    row = c.fetchone()
+    if row:
+        stats_data = {"games_played": row[0], "wins": row[1], "losses": row[2]}
+    else:
+        stats_data = {"games_played": 0, "wins": 0, "losses": 0}
+    embed = discord.Embed(title="Your Game Stats", color=0x000000)
+    if interaction.user.avatar:
+        embed.set_thumbnail(url=interaction.user.avatar.url)
+    embed.add_field(name="Games Played", value=str(stats_data["games_played"]), inline=True)
+    embed.add_field(name="Wins", value=str(stats_data["wins"]), inline=True)
+    embed.add_field(name="Losses", value=str(stats_data["losses"]), inline=True)
+    embed.set_footer(text="Keep playing and improve!")
+    await interaction.response.send_message(embed=embed)
+
+##################################
 # 9. Run the Bot + KeepAlive     #
 ##################################
-keep_alive()  # Start Flask server for uptime
+keep_alive()  # Start the Flask server for uptime
 bot.run(BOT_TOKEN)
+
