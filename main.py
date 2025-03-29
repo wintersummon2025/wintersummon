@@ -20,7 +20,7 @@ import threading
 
 # === SENSITIVE TOKENS (Demo Only) ===
 # In production, use environment variables or a .env file.
-BOT_TOKEN = "MTM1NDgxNDAyNjY5MzA4MzI4OA.GIQZAS.F63fTH3l7dLrv9jJbpLRqdH521OorMeUDAVj10"
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
 
 # === Discord Settings ===
 SERVER_ID = 1341825447964577873
