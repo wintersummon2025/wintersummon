@@ -422,7 +422,7 @@ async def start_snowquiz(context, user):
         {"question": "In Naruto, who is known as the Copy Ninja?", "answer": "kakashi"}
     ]
     random.shuffle(questions)
-     correct = 0
+    correct = 0
     for i, qa in enumerate(questions, start=1):
         msg = await channel.send(f"**Q{i}:** {qa['question']}\n(You have 10 seconds to answer!)")
         # Start live countdown
